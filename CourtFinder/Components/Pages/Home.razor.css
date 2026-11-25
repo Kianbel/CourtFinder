@@ -55,12 +55,6 @@
     padding: .5rem 0;
 }
 
-.sport-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .6rem;
-}
-
 .sport-chips .chip {
     background: rgba(255, 255, 255, .08);
     border-color: rgba(255, 255, 255, .18);
