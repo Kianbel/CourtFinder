@@ -14,10 +14,9 @@ builder.Services.AddScoped(_ =>
         ?? throw new InvalidOperationException("Supabase:AnonKey is not configured.");
     return new Supabase.Client(url, key, new Supabase.SupabaseOptions { AutoRefreshToken = true });
 });
-
 builder.Services.AddScoped<CourtFinder.Services.CourtService>();
-
 builder.Services.AddScoped<CourtFinder.Services.SupabaseGate>();
+builder.Services.AddScoped<CourtFinder.Services.AuthService>();
 
 var app = builder.Build();
 
