@@ -7,7 +7,7 @@
 </div>
 
 @code {
-    [Parameter, EditorRequired] public IReadOnlyList<MapPin> Pins { get; set; } = [];
+    [Parameter, EditorRequired] public List<MapPin> Pins { get; set; } = new();
 
     private ElementReference mapElement;
     private IJSObjectReference? module;

@@ -233,7 +233,7 @@
     [Parameter] public Guid Id { get; set; }
 
     private CourtDetails? details;
-    private IReadOnlyList<MapPin> pins = [];
+    private List<MapPin> pins = new();
     private bool loading = true;
     private bool failed;
 
@@ -247,7 +247,7 @@
         {
             details = await CourtApi.GetCourtDetailsAsync(Id);
             if (details is not null)
-                pins = [BuildPin(details)];
+                pins = new List<MapPin> { BuildPin(details) };
         }
         catch (Exception)
         {
