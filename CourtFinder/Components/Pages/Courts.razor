@@ -1,6 +1,6 @@
 @page "/courts"
 @attribute [StreamRendering]
-@inject CourtService Courts
+@inject CourtService CourtApi
 
 <PageTitle>Explore courts | CourtFinder</PageTitle>
 
@@ -99,12 +99,12 @@
 
         try
         {
-            sports = await Courts.GetSportsAsync();
+            sports = await CourtApi.GetSportsAsync();
 
             // Only accept a sport slug that really exists
             activeSport = sports.FirstOrDefault(s => s.Slug == SportSlug);
 
-            var list = await Courts.GetCourtCardsAsync(activeSport?.Slug, Query);
+            var list = await CourtApi.GetCourtCardsAsync(activeSport?.Slug, Query);
             courts = SortCourts(list, Sort);
         }
         catch (Exception)
