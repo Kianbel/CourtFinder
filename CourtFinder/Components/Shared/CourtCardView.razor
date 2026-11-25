@@ -1,0 +1,59 @@
+@inject CourtService Courts
+
+<a class="court-card" href="courts/@Court.Id">
+    <div class="media">
+        @if (CoverUrl is not null)
+        {
+            <img src="@CoverUrl" alt="" loading="lazy" />
+        }
+        else
+        {
+            <div class="placeholder" aria-hidden="true">@SportMeta.Emoji(Court.Sports.FirstOrDefault())</div>
+        }
+        <span class="env">@(Court.IsIndoor ? "Indoor" : "Outdoor")</span>
+    </div>
+
+    <div class="body">
+        <div class="title-row">
+            <h3>@Court.Name</h3>
+            <span class="rating">
+                @if (Court.AvgRating is null)
+                {
+                    <span class="new">New</span>
+                }
+                else
+                {
+                    <span>★ @Court.AvgRating.Value.ToString("0.0")</span>
+                    <span class="count">(@Court.ReviewCount)</span>
+                }
+            </span>
+        </div>
+
+        <p class="loc">@Court.Address, @Court.City</p>
+
+        <div class="tags">
+            @foreach (var slug in Court.Sports)
+            {
+                <span class="chip chip-sm">@SportMeta.Emoji(slug) @SportMeta.Label(slug)</span>
+            }
+        </div>
+
+        <div class="foot">
+            @if (Court.MinPrice is not null)
+            {
+                <span><strong>₱@Court.MinPrice.Value.ToString("N0")</strong> <span class="muted">/ hour</span></span>
+            }
+            else
+            {
+                <span class="muted">Price on request</span>
+            }
+            <span class="view">View →</span>
+        </div>
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public CourtCard Court { get; set; } = default!;
+
+    private string? CoverUrl => Courts.GetPhotoUrl(Court.CoverPath);
+}

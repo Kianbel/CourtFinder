@@ -1,7 +1,117 @@
 ﻿@page "/"
+@inject CourtService Courts
 
-<PageTitle>Home</PageTitle>
+<PageTitle>CourtFinder: Find a court for your next game</PageTitle>
 
-<h1>Hello, world!</h1>
+<section class="hero">
+    <div class="container hero-inner">
+        <span class="eyebrow">Courts for every sport</span>
+        <h1>Find your next court.<br />Book it. Play.</h1>
+        <p class="lead">
+            Browse pickleball, badminton, basketball and volleyball courts on the map,
+            read honest reviews, and see exactly where to book.
+        </p>
 
-Welcome to your new app.
+        <form class="search" method="get" action="courts" role="search">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input type="search" name="q" placeholder="Search courts by name" aria-label="Search courts by name" />
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+
+        <div class="sport-chips">
+            @foreach (var sport in sports)
+            {
+                <a class="chip" href="courts?sport=@sport.Slug">
+                    <span aria-hidden="true">@SportMeta.Emoji(sport.Slug)</span> @sport.Name
+                </a>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="section-head">
+            <div>
+                <h2>Popular courts</h2>
+                <p>Top-rated places to play right now.</p>
+            </div>
+            <a class="btn btn-secondary" href="courts">See all courts</a>
+        </div>
+
+        @if (failed)
+        {
+            <div class="alert">We couldn't load courts right now. Please refresh the page and try again.</div>
+        }
+        else if (popular.Count == 0)
+        {
+            <div class="empty">No courts listed yet. Be the first to add one!</div>
+        }
+        else
+        {
+            <div class="grid-cards">
+                @foreach (var court in popular)
+                {
+                    <CourtCardView Court="court" />
+                }
+            </div>
+        }
+    </div>
+</section>
+
+<section class="section how">
+    <div class="container">
+        <div class="section-head">
+            <div>
+                <h2>How it works</h2>
+                <p>From search to game time in three steps.</p>
+            </div>
+        </div>
+
+        <div class="steps">
+            <div class="card step">
+                <span class="num">1</span>
+                <h3>Pick your sport</h3>
+                <p class="muted">Filter courts by pickleball, badminton, basketball, volleyball and more.</p>
+            </div>
+            <div class="card step">
+                <span class="num">2</span>
+                <h3>Explore the map</h3>
+                <p class="muted">See where courts are, check amenities, prices and what other players think.</p>
+            </div>
+            <div class="card step">
+                <span class="num">3</span>
+                <h3>Book and play</h3>
+                <p class="muted">Jump straight to the court's own booking page, Messenger or phone number.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    private List<Sport> sports = new();
+    private List<CourtCard> popular = new();
+    private bool failed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            sports = await Courts.GetSportsAsync();
+            var cards = await Courts.GetCourtCardsAsync();
+            popular = cards
+                .OrderByDescending(c => c.AvgRating ?? 0)
+                .ThenByDescending(c => c.ReviewCount)
+                .ThenBy(c => c.Name)
+                .Take(3)
+                .ToList();
+        }
+        catch (Exception)
+        {
+            failed = true;
+        }
+    }
+}
