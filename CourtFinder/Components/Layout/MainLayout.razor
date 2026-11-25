@@ -19,7 +19,7 @@
         </nav>
 
         <div class="nav-actions">
-            <a class="btn btn-primary" href="login">Sign in</a>
+            <UserMenu />
         </div>
     </div>
 </header>
@@ -40,3 +40,13 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code {
+    [Inject] private AuthService Auth { get; set; } = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await Auth.InitializeAsync();
+    }
+}

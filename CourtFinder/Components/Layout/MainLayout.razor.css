@@ -82,7 +82,11 @@
 @media (max-width: 640px) {
     .nav { gap: 1rem; }
     .nav-links { display: none; }
-    .nav-actions { margin-left: auto; }
+    .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
 }
 
 #blazor-error-ui {

@@ -1,0 +1,38 @@
+@implements IDisposable
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+@if (!Auth.IsInitialized)
+{
+    <span class="placeholder" aria-hidden="true"></span>
+}
+else if (Auth.IsSignedIn)
+{
+    <div class="user">
+        <span class="avatar" aria-hidden="true">@Initial</span>
+        <span class="name">@Auth.DisplayName</span>
+        <button type="button" class="btn btn-secondary" @onclick="SignOutAsync">Sign out</button>
+    </div>
+}
+else
+{
+    <a class="btn btn-ghost signin" href="login">Sign in</a>
+    <a class="btn btn-primary" href="signup">Sign up</a>
+}
+
+@code {
+    private string Initial =>
+        string.IsNullOrWhiteSpace(Auth.DisplayName) ? "?" : char.ToUpper(Auth.DisplayName.Trim()[0]).ToString();
+
+    protected override void OnInitialized() => Auth.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task SignOutAsync()
+    {
+        await Auth.SignOutAsync();
+        Nav.NavigateTo("/");
+    }
+
+    public void Dispose() => Auth.Changed -= OnChanged;
+}
