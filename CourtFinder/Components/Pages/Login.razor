@@ -1,0 +1,103 @@
+@page "/login"
+@implements IDisposable
+@using System.ComponentModel.DataAnnotations
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Sign in | CourtFinder</PageTitle>
+
+<div class="auth-wrap">
+    <div class="card auth-card">
+        <div>
+            <h1>Welcome back</h1>
+            <p class="muted">Sign in to review courts and manage your listings.</p>
+        </div>
+
+        <EditForm Model="model" OnValidSubmit="SubmitAsync" class="auth-form">
+            <DataAnnotationsValidator />
+
+            @if (error is not null)
+            {
+                <div class="alert" role="alert">@error</div>
+            }
+
+            <div>
+                <label class="label" for="email">Email</label>
+                <InputText id="email" type="email" class="input" autocomplete="email" @bind-Value="model.Email" />
+                <ValidationMessage For="() => model.Email" />
+            </div>
+
+            <div>
+                <label class="label" for="password">Password</label>
+                <InputText id="password" type="password" class="input" autocomplete="current-password" @bind-Value="model.Password" />
+                <ValidationMessage For="() => model.Password" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg" disabled="@busy">
+                @(busy ? "Signing in..." : "Sign in")
+            </button>
+        </EditForm>
+
+        <p class="auth-switch">New to CourtFinder? <a href="@SignUpHref">Create an account</a></p>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+
+    private readonly LoginModel model = new();
+    private string? error;
+    private bool busy;
+
+    // Only follow local paths, so a crafted link can't redirect to another site
+    private string Destination =>
+        !string.IsNullOrEmpty(ReturnUrl) && ReturnUrl.StartsWith('/')
+        && !ReturnUrl.StartsWith("//") && !ReturnUrl.StartsWith("/\\")
+            ? ReturnUrl
+            : "/";
+
+    private string SignUpHref =>
+        string.IsNullOrEmpty(ReturnUrl) ? "signup" : $"signup?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnAuthChanged;
+        if (Auth.IsSignedIn) Nav.NavigateTo(Destination);
+    }
+
+    // Already signed in (e.g. the saved session was just restored): leave this page
+    private void OnAuthChanged()
+    {
+        if (Auth.IsSignedIn && !busy)
+            InvokeAsync(() => Nav.NavigateTo(Destination));
+    }
+
+    private async Task SubmitAsync()
+    {
+        busy = true;
+        error = null;
+
+        var result = await Auth.SignInAsync(model.Email, model.Password);
+
+        if (result.Ok)
+        {
+            Nav.NavigateTo(Destination);
+            return;
+        }
+
+        error = result.Error;
+        busy = false;
+    }
+
+    public void Dispose() => Auth.Changed -= OnAuthChanged;
+
+    private sealed class LoginModel
+    {
+        [Required(ErrorMessage = "Enter your email.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Enter your password.")]
+        public string Password { get; set; } = "";
+    }
+}

@@ -1,0 +1,145 @@
+@page "/signup"
+@implements IDisposable
+@using System.ComponentModel.DataAnnotations
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Create account | CourtFinder</PageTitle>
+
+<div class="auth-wrap">
+    <div class="card auth-card">
+        @if (confirmationSent)
+        {
+            <div class="auth-success">
+                <span style="font-size:2.5rem" aria-hidden="true">📬</span>
+                <h1>Check your inbox</h1>
+                <p class="muted">
+                    We sent a confirmation link to <strong>@model.Email</strong>.
+                    Confirm your email, then sign in.
+                </p>
+                <a class="btn btn-primary" href="@LoginHref">Go to sign in</a>
+            </div>
+        }
+        else
+        {
+            <div>
+                <h1>Create your account</h1>
+                <p class="muted">Review courts, or list your own so players can find it.</p>
+            </div>
+
+            <EditForm Model="model" OnValidSubmit="SubmitAsync" class="auth-form">
+                <DataAnnotationsValidator />
+
+                @if (error is not null)
+                {
+                    <div class="alert" role="alert">@error</div>
+                }
+
+                <div>
+                    <label class="label" for="name">Display name</label>
+                    <InputText id="name" class="input" autocomplete="nickname" @bind-Value="model.DisplayName" />
+                    <ValidationMessage For="() => model.DisplayName" />
+                </div>
+
+                <div>
+                    <label class="label" for="email">Email</label>
+                    <InputText id="email" type="email" class="input" autocomplete="email" @bind-Value="model.Email" />
+                    <ValidationMessage For="() => model.Email" />
+                </div>
+
+                <div>
+                    <label class="label" for="password">Password</label>
+                    <InputText id="password" type="password" class="input" autocomplete="new-password" @bind-Value="model.Password" />
+                    <ValidationMessage For="() => model.Password" />
+                </div>
+
+                <div>
+                    <label class="label" for="confirm">Confirm password</label>
+                    <InputText id="confirm" type="password" class="input" autocomplete="new-password" @bind-Value="model.ConfirmPassword" />
+                    <ValidationMessage For="() => model.ConfirmPassword" />
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" disabled="@busy">
+                    @(busy ? "Creating account..." : "Create account")
+                </button>
+            </EditForm>
+
+            <p class="auth-switch">Already have an account? <a href="@LoginHref">Sign in</a></p>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+
+    private readonly SignUpModel model = new();
+    private string? error;
+    private bool busy;
+    private bool confirmationSent;
+
+    private string Destination =>
+        !string.IsNullOrEmpty(ReturnUrl) && ReturnUrl.StartsWith('/')
+        && !ReturnUrl.StartsWith("//") && !ReturnUrl.StartsWith("/\\")
+            ? ReturnUrl
+            : "/";
+
+    private string LoginHref =>
+        string.IsNullOrEmpty(ReturnUrl) ? "login" : $"login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnAuthChanged;
+        if (Auth.IsSignedIn) Nav.NavigateTo(Destination);
+    }
+
+    private void OnAuthChanged()
+    {
+        if (Auth.IsSignedIn && !busy)
+            InvokeAsync(() => Nav.NavigateTo(Destination));
+    }
+
+    private async Task SubmitAsync()
+    {
+        busy = true;
+        error = null;
+
+        var result = await Auth.SignUpAsync(model.DisplayName, model.Email, model.Password);
+
+        if (result.Ok && result.NeedsConfirmation)
+        {
+            confirmationSent = true;
+            busy = false;
+            return;
+        }
+
+        if (result.Ok)
+        {
+            Nav.NavigateTo(Destination);
+            return;
+        }
+
+        error = result.Error;
+        busy = false;
+    }
+
+    public void Dispose() => Auth.Changed -= OnAuthChanged;
+
+    private sealed class SignUpModel
+    {
+        [Required(ErrorMessage = "Enter a display name.")]
+        [StringLength(60, ErrorMessage = "Keep it under 60 characters.")]
+        public string DisplayName { get; set; } = "";
+
+        [Required(ErrorMessage = "Enter your email.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Choose a password.")]
+        [MinLength(8, ErrorMessage = "Use at least 8 characters.")]
+        public string Password { get; set; } = "";
+
+        [Required(ErrorMessage = "Confirm your password.")]
+        [Compare(nameof(Password), ErrorMessage = "Passwords don't match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}
