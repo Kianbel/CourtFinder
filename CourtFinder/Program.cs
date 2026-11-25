@@ -15,6 +15,8 @@ builder.Services.AddScoped(_ =>
     return new Supabase.Client(url, key, new Supabase.SupabaseOptions { AutoRefreshToken = true });
 });
 
+builder.Services.AddScoped<CourtFinder.Services.CourtService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
