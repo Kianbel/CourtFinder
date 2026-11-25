@@ -1,0 +1,136 @@
+@page "/courts"
+@attribute [StreamRendering]
+@inject CourtService Courts
+
+<PageTitle>Explore courts | CourtFinder</PageTitle>
+
+<section class="page-head">
+    <div class="container">
+        <h1>Explore courts</h1>
+        <p class="muted">Find a place to play, then check the reviews and where to book.</p>
+
+        <form class="filters" method="get" action="courts" role="search">
+            @if (activeSport is not null)
+            {
+                <input type="hidden" name="sport" value="@activeSport.Slug" />
+            }
+
+            <label class="filter-search">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                </svg>
+                <input type="search" name="q" value="@Query" placeholder="Search by court name" aria-label="Search by court name" />
+            </label>
+
+            <select class="select sort" name="sort" aria-label="Sort courts">
+                <option value="name" selected="@(Sort is null or "name")">Name (A to Z)</option>
+                <option value="rating" selected="@(Sort == "rating")">Top rated</option>
+                <option value="price" selected="@(Sort == "price")">Lowest price</option>
+            </select>
+
+            <button type="submit" class="btn btn-primary">Apply</button>
+        </form>
+
+        <div class="sport-chips">
+            <a class="chip @(activeSport is null ? "active" : "")" href="@BuildUrl(null)">All sports</a>
+            @foreach (var sport in sports)
+            {
+                <a class="chip @(activeSport?.Slug == sport.Slug ? "active" : "")" href="@BuildUrl(sport.Slug)">
+                    <span aria-hidden="true">@SportMeta.Emoji(sport.Slug)</span> @sport.Name
+                </a>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="section results">
+    <div class="container">
+        @if (courts is null)
+        {
+            <div class="grid-cards" aria-busy="true" aria-label="Loading courts">
+                @for (var i = 0; i < 6; i++)
+                {
+                    <div class="skeleton skel-card"></div>
+                }
+            </div>
+        }
+        else if (failed)
+        {
+            <div class="alert">We couldn't load courts right now. Please refresh the page and try again.</div>
+        }
+        else if (courts.Count == 0)
+        {
+            <div class="empty">
+                <h2>No courts match your search</h2>
+                <p>Try a different sport or a shorter search term.</p>
+                <a class="btn btn-secondary" href="courts">Clear filters</a>
+            </div>
+        }
+        else
+        {
+            <p class="result-count muted">
+                @courts.Count @(courts.Count == 1 ? "court" : "courts")@(activeSport is null ? "" : $" for {activeSport.Name}")
+            </p>
+            <div class="grid-cards">
+                @foreach (var court in courts)
+                {
+                    <CourtCardView Court="court" />
+                }
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "sport")] public string? SportSlug { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+
+    private List<Sport> sports = new();
+    private List<CourtCard>? courts;
+    private Sport? activeSport;
+    private bool failed;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        courts = null;
+        failed = false;
+
+        try
+        {
+            sports = await Courts.GetSportsAsync();
+
+            // Only accept a sport slug that really exists
+            activeSport = sports.FirstOrDefault(s => s.Slug == SportSlug);
+
+            var list = await Courts.GetCourtCardsAsync(activeSport?.Slug, Query);
+            courts = SortCourts(list, Sort);
+        }
+        catch (Exception)
+        {
+            failed = true;
+            courts = new();
+        }
+    }
+
+    private static List<CourtCard> SortCourts(List<CourtCard> list, string? sort) => sort switch
+    {
+        "rating" => list.OrderByDescending(c => c.AvgRating ?? 0)
+                        .ThenByDescending(c => c.ReviewCount)
+                        .ThenBy(c => c.Name).ToList(),
+        "price" => list.OrderBy(c => c.MinPrice ?? decimal.MaxValue)
+                       .ThenBy(c => c.Name).ToList(),
+        _ => list.OrderBy(c => c.Name).ToList()
+    };
+
+    // Keeps the current search and sort when switching sport chips
+    private string BuildUrl(string? sportSlug)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(sportSlug)) parts.Add($"sport={Uri.EscapeDataString(sportSlug)}");
+        if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query.Trim())}");
+        if (!string.IsNullOrEmpty(Sort)) parts.Add($"sort={Uri.EscapeDataString(Sort)}");
+        return parts.Count == 0 ? "courts" : "courts?" + string.Join("&", parts);
+    }
+}
