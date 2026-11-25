@@ -1,0 +1,38 @@
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="map-wrap">
+    <div @ref="mapElement" class="court-map" aria-label="Map of courts"></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<MapPin> Pins { get; set; } = [];
+
+    private ElementReference mapElement;
+    private IJSObjectReference? module;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/courtmap.js");
+        await module.InvokeVoidAsync("init", mapElement);
+        await module.InvokeVoidAsync("setPins", mapElement, Pins);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is null) return;
+
+        try
+        {
+            await module.InvokeVoidAsync("destroy", mapElement);
+            await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser connection is already gone; nothing to clean up.
+        }
+    }
+}
