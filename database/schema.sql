@@ -308,3 +308,25 @@ create policy "Owners delete court photos" on storage.objects
       where c.id::text = (storage.foldername(name))[1] and c.owner_id = auth.uid()
     )
   );
+
+  -- API role access (RLS policies still decide which rows are visible/editable)
+grant usage on schema public to anon, authenticated;
+
+-- Everyone can read tables and the court_cards view
+grant select on all tables in schema public to anon, authenticated;
+
+-- Signed-in users can write; RLS limits them to their own rows
+grant insert, update, delete on
+  public.courts,
+  public.court_sports,
+  public.court_amenities,
+  public.booking_links,
+  public.court_photos,
+  public.reviews
+to authenticated;
+
+grant update on public.profiles to authenticated;
+
+-- Make future tables/views readable by default too
+alter default privileges in schema public
+  grant select on tables to anon, authenticated;
