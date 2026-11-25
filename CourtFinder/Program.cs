@@ -6,6 +6,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddScoped(_ =>
+{
+    var url = builder.Configuration["Supabase:Url"]
+        ?? throw new InvalidOperationException("Supabase:Url is not configured.");
+    var key = builder.Configuration["Supabase:AnonKey"]
+        ?? throw new InvalidOperationException("Supabase:AnonKey is not configured.");
+    return new Supabase.Client(url, key, new Supabase.SupabaseOptions { AutoRefreshToken = true });
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
