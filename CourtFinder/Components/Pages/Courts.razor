@@ -69,14 +69,22 @@
         }
         else
         {
-            <p class="result-count muted">
-                @courts.Count @(courts.Count == 1 ? "court" : "courts")@(activeSport is null ? "" : $" for {activeSport.Name}")
-            </p>
-            <div class="grid-cards">
-                @foreach (var court in courts)
-                {
-                    <CourtCardView Court="court" />
-                }
+            <div class="results-layout">
+                <div class="list-col">
+                    <p class="result-count muted">
+                        @courts.Count @(courts.Count == 1 ? "court" : "courts")@(activeSport is null ? "" : $" for {activeSport.Name}")
+                    </p>
+                    <div class="grid-cards">
+                        @foreach (var court in courts)
+                        {
+                            <CourtCardView Court="court" />
+                        }
+                    </div>
+                </div>
+
+                <aside class="map-col" aria-label="Map">
+                    <CourtMap Pins="pins" />
+                </aside>
             </div>
         }
     </div>
@@ -91,6 +99,7 @@
     private List<CourtCard>? courts;
     private Sport? activeSport;
     private bool failed;
+    private List<MapPin> pins = new();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -106,6 +115,7 @@
 
             var list = await CourtApi.GetCourtCardsAsync(activeSport?.Slug, Query);
             courts = SortCourts(list, Sort);
+            pins = courts.Select(MapPin.From).ToList();
         }
         catch (Exception)
         {

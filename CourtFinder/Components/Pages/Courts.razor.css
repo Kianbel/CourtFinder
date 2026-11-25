@@ -75,3 +75,30 @@
 .empty .btn {
     margin-top: 1.25rem;
 }
+
+.results-layout {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: start;
+}
+
+.map-col {
+    position: sticky;
+    top: 5rem;
+    height: calc(100vh - 6.5rem);
+    min-height: 24rem;
+}
+
+@media (max-width: 960px) {
+    .results-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .map-col {
+        order: -1;
+        position: static;
+        height: 20rem;
+        min-height: 0;
+    }
+}
