@@ -1,0 +1,290 @@
+@page "/courts/{Id:guid}"
+@attribute [StreamRendering]
+@using System.Globalization
+@inject CourtService CourtApi
+
+<PageTitle>@(details?.Court.Name ?? "Court") | CourtFinder</PageTitle>
+
+<div class="container detail">
+    <a class="back" href="courts">← Back to courts</a>
+
+    @if (loading)
+    {
+        <div class="skeleton sk-title" aria-busy="true"></div>
+        <div class="skeleton sk-gallery"></div>
+    }
+    else if (failed)
+    {
+        <div class="alert">We couldn't load this court right now. Please refresh the page and try again.</div>
+    }
+    else if (details is null)
+    {
+        <div class="empty">
+            <h2>Court not found</h2>
+            <p>It may have been removed, or the link is incorrect.</p>
+            <a class="btn btn-secondary" href="courts">Browse all courts</a>
+        </div>
+    }
+    else
+    {
+        var d = details;
+        var c = d.Court;
+        var photos = d.PhotoUrls;
+
+        <header class="head">
+            <div>
+                <div class="badges">
+                    <span class="chip chip-sm">@(c.IsIndoor ? "Indoor" : "Outdoor")</span>
+                    @foreach (var s in d.Sports)
+                    {
+                        <span class="chip chip-sm">@SportMeta.Emoji(s.Sport.Slug) @s.Sport.Name</span>
+                    }
+                </div>
+                <h1>@c.Name</h1>
+                <p class="addr">📍 @c.Address, @c.City@(string.IsNullOrWhiteSpace(c.Province) ? "" : ", " + c.Province)</p>
+            </div>
+
+            <a class="score" href="#reviews">
+                @if (d.AverageRating is null)
+                {
+                    <strong>New</strong>
+                    <span>No reviews yet</span>
+                }
+                else
+                {
+                    <strong>★ @d.AverageRating.Value.ToString("0.0", CultureInfo.InvariantCulture)</strong>
+                    <span>@d.Reviews.Count @(d.Reviews.Count == 1 ? "review" : "reviews")</span>
+                }
+            </a>
+        </header>
+
+        @if (photos.Count > 0)
+        {
+            <div class="gallery @(photos.Count == 1 ? "single" : "")">
+                @for (var i = 0; i < Math.Min(5, photos.Count); i++)
+                {
+                    var url = photos[i];
+                    <a class="shot @(i == 0 ? "main" : "")" href="@url" target="_blank" rel="noopener noreferrer">
+                        <img src="@url" alt="@c.Name photo @(i + 1)" loading="@(i == 0 ? "eager" : "lazy")" />
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="gallery-empty" aria-hidden="true">@SportMeta.Emoji(d.Sports.FirstOrDefault()?.Sport.Slug)</div>
+        }
+
+        <div class="cols">
+            <div class="main">
+                @if (!string.IsNullOrWhiteSpace(c.Description))
+                {
+                    <section class="block">
+                        <h2>About</h2>
+                        <p class="desc">@c.Description</p>
+                    </section>
+                }
+
+                @if (d.Sports.Count > 0)
+                {
+                    <section class="block">
+                        <h2>Sports and prices</h2>
+                        <div class="sport-grid">
+                            @foreach (var s in d.Sports)
+                            {
+                                <div class="card sport-card">
+                                    <span class="emoji" aria-hidden="true">@SportMeta.Emoji(s.Sport.Slug)</span>
+                                    <div>
+                                        <strong>@s.Sport.Name</strong>
+                                        <div class="muted">@s.CourtCount @(s.CourtCount == 1 ? "court" : "courts")</div>
+                                    </div>
+                                    <div class="price">
+                                        <strong>₱@s.PricePerHour.ToString("N0", CultureInfo.InvariantCulture)</strong>
+                                        <span class="muted">/ hour</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </section>
+                }
+
+                @if (d.Amenities.Count > 0)
+                {
+                    <section class="block">
+                        <h2>Amenities</h2>
+                        <ul class="amenities">
+                            @foreach (var a in d.Amenities)
+                            {
+                                <li><span class="tick" aria-hidden="true">✓</span> @a.Name</li>
+                            }
+                        </ul>
+                    </section>
+                }
+
+                <section class="block" id="reviews">
+                    <div class="section-head">
+                        <h2>Reviews</h2>
+                        @if (d.AverageRating is not null)
+                        {
+                            <span class="muted">★ @d.AverageRating.Value.ToString("0.0", CultureInfo.InvariantCulture) average from @d.Reviews.Count @(d.Reviews.Count == 1 ? "review" : "reviews")</span>
+                        }
+                    </div>
+
+                    @if (d.Reviews.Count == 0)
+                    {
+                        <div class="card no-reviews">No reviews yet.</div>
+                    }
+                    else
+                    {
+                        <ul class="reviews">
+                            @foreach (var r in d.Reviews)
+                            {
+                                <li class="card review">
+                                    <span class="avatar" aria-hidden="true">@Initial(r.AuthorName)</span>
+                                    <div class="review-body">
+                                        <div class="review-top">
+                                            <strong>@r.AuthorName</strong>
+                                            <span class="muted">@r.CreatedAt.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)</span>
+                                        </div>
+                                        <div class="stars" aria-label="@r.Rating out of 5 stars">@Stars(r.Rating)</div>
+                                        @if (!string.IsNullOrWhiteSpace(r.Comment))
+                                        {
+                                            <p>@r.Comment</p>
+                                        }
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            </div>
+
+            <aside class="side">
+                <section class="card side-card">
+                    <h3>Book this court</h3>
+                    @if (d.BookingLinks.Count == 0)
+                    {
+                        <p class="muted">The owner hasn't added booking details yet.</p>
+                    }
+                    else
+                    {
+                        <div class="bookings">
+                            @foreach (var link in d.BookingLinks)
+                            {
+                                var href = BookingUi.Href(link);
+                                @if (href is not null)
+                                {
+                                    <a class="booking" href="@href"
+                                       target="@(BookingUi.IsExternal(link) ? "_blank" : null)"
+                                       rel="@(BookingUi.IsExternal(link) ? "noopener noreferrer" : null)">
+                                        <span class="b-icon" aria-hidden="true">@BookingUi.Icon(link.Kind)</span>
+                                        <span class="b-text">
+                                            <strong>@BookingUi.Label(link.Kind)</strong>
+                                            <small>@BookingUi.Display(link)</small>
+                                        </span>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="booking note">
+                                        <span class="b-icon" aria-hidden="true">@BookingUi.Icon(link.Kind)</span>
+                                        <span class="b-text">
+                                            <strong>@BookingUi.Label(link.Kind)</strong>
+                                            <small>@link.Value</small>
+                                        </span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </section>
+
+                <section class="card side-card">
+                    <h3>Details</h3>
+                    <dl class="facts">
+                        @if (c.OpeningTime is not null && c.ClosingTime is not null)
+                        {
+                            <dt>Hours</dt>
+                            <dd>@FormatTime(c.OpeningTime.Value) to @FormatTime(c.ClosingTime.Value)</dd>
+                        }
+                        <dt>Setting</dt>
+                        <dd>@(c.IsIndoor ? "Indoor" : "Outdoor")</dd>
+                        @if (!string.IsNullOrWhiteSpace(c.Surface))
+                        {
+                            <dt>Surface</dt>
+                            <dd>@c.Surface</dd>
+                        }
+                    </dl>
+                </section>
+
+                <section class="card side-card">
+                    <h3>Location</h3>
+                    <div class="map-box">
+                        <CourtMap Pins="pins" />
+                    </div>
+                    <a class="btn btn-secondary directions" href="@DirectionsUrl(c)" target="_blank" rel="noopener noreferrer">Get directions</a>
+                </section>
+            </aside>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private CourtDetails? details;
+    private IReadOnlyList<MapPin> pins = [];
+    private bool loading = true;
+    private bool failed;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        failed = false;
+        details = null;
+
+        try
+        {
+            details = await CourtApi.GetCourtDetailsAsync(Id);
+            if (details is not null)
+                pins = [BuildPin(details)];
+        }
+        catch (Exception)
+        {
+            failed = true;
+        }
+
+        loading = false;
+    }
+
+    private static MapPin BuildPin(CourtDetails d)
+    {
+        var c = d.Court;
+        var rating = d.AverageRating is null
+            ? "New"
+            : $"★ {d.AverageRating.Value.ToString("0.0", CultureInfo.InvariantCulture)} ({d.Reviews.Count})";
+
+        return new MapPin(
+            c.Id,
+            c.Name,
+            $"{c.Address}, {c.City}",
+            c.Latitude,
+            c.Longitude,
+            SportMeta.Emoji(d.Sports.FirstOrDefault()?.Sport.Slug),
+            rating);
+    }
+
+    private static string DirectionsUrl(Court c) =>
+        "https://www.google.com/maps/dir/?api=1&destination="
+        + c.Latitude.ToString(CultureInfo.InvariantCulture) + ","
+        + c.Longitude.ToString(CultureInfo.InvariantCulture);
+
+    private static string FormatTime(TimeSpan t) =>
+        DateTime.Today.Add(t).ToString("h:mm tt", CultureInfo.InvariantCulture);
+
+    private static string Stars(int rating) =>
+        new string('★', Math.Clamp(rating, 0, 5)) + new string('☆', 5 - Math.Clamp(rating, 0, 5));
+
+    private static string Initial(string name) =>
+        string.IsNullOrWhiteSpace(name) ? "?" : char.ToUpper(name.Trim()[0]).ToString();
+}
