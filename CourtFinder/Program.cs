@@ -17,6 +17,8 @@ builder.Services.AddScoped(_ =>
 
 builder.Services.AddScoped<CourtFinder.Services.CourtService>();
 
+builder.Services.AddScoped<CourtFinder.Services.SupabaseGate>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

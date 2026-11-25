@@ -3,20 +3,13 @@ using static Supabase.Postgrest.Constants;
 
 namespace CourtFinder.Services;
 
-public class CourtService(Supabase.Client client)
+public class CourtService(Supabase.Client client, SupabaseGate gate)
 {
     private const string PhotoBucket = "court-photos";
 
     private List<Sport>? _sports;
     private List<Amenity>? _amenities;
-    private bool _initialized;
-
-    private async Task EnsureInitializedAsync()
-    {
-        if (_initialized) return;
-        await client.InitializeAsync();
-        _initialized = true;
-    }
+    private Task EnsureInitializedAsync() => gate.EnsureInitializedAsync();
 
     public async Task<List<Sport>> GetSportsAsync()
     {
