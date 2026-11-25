@@ -6,7 +6,7 @@ namespace CourtFinder.Services;
 
 public record AuthResult(bool Ok, string? Error = null, bool NeedsConfirmation = false);
 
-public class AuthService(SupabaseGate gate, ProtectedLocalStorage storage)
+public class AuthService(SupabaseGate gate, ProtectedLocalStorage storage, ILogger<AuthService> logger)
 {
     private const string StorageKey = "courtfinder.session";
 
@@ -77,6 +77,7 @@ public class AuthService(SupabaseGate gate, ProtectedLocalStorage storage)
         }
         catch (Exception ex)
         {
+            logger.LogWarning(ex, "Auth request failed");
             return new AuthResult(false, FriendlyError(ex));
         }
     }
@@ -93,7 +94,9 @@ public class AuthService(SupabaseGate gate, ProtectedLocalStorage storage)
                 Data = new Dictionary<string, object> { ["display_name"] = displayName.Trim() }
             };
 
+            #pragma warning disable CS0618 // Obsolete SignUp ignores FlowType/Channel, which we don't use. Revisit before upgrading to Gotrue v9.
             var session = await gate.Client.Auth.SignUp(email.Trim(), password, options);
+            #pragma warning restore CS0618
 
             // No session means the project requires email confirmation first
             if (session?.AccessToken is null)
@@ -106,6 +109,7 @@ public class AuthService(SupabaseGate gate, ProtectedLocalStorage storage)
         }
         catch (Exception ex)
         {
+            logger.LogWarning(ex, "Auth request failed");
             return new AuthResult(false, FriendlyError(ex));
         }
     }
@@ -185,7 +189,8 @@ public class AuthService(SupabaseGate gate, ProtectedLocalStorage storage)
             return "An account with this email already exists. Try signing in instead.";
         if (m.Contains("rate limit") || m.Contains("too many"))
             return "Too many attempts. Please wait a moment and try again.";
-
+        if (m.Contains("email_provider_disabled") || m.Contains("signup_disabled") || m.Contains("signups are disabled"))
+            return "Sign-ups are currently turned off. Please try again later.";
         return "Something went wrong. Please try again.";
     }
 }
