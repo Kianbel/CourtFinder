@@ -1,0 +1,120 @@
+@page "/owner/courts"
+@inject AuthService Auth
+@inject OwnerCourtService OwnerApi
+@inject NavigationManager Nav
+@inject ILogger<MyCourtsPage> Log
+
+<PageTitle>My courts | CourtFinder</PageTitle>
+
+<div class="container mine">
+    <div class="section-head">
+        <div>
+            <h1>My courts</h1>
+            <p>Courts you've listed on CourtFinder.</p>
+        </div>
+        <a class="btn btn-primary" href="owner/courts/new">+ List a court</a>
+    </div>
+
+    @if (error is not null)
+    {
+        <div class="alert top-alert" role="alert">@error</div>
+    }
+
+    @if (loading)
+    {
+        <div class="grid-cards" aria-busy="true" aria-label="Loading your courts">
+            @for (var i = 0; i < 3; i++)
+            {
+                <div class="skeleton skel-card"></div>
+            }
+        </div>
+    }
+    else if (failed)
+    {
+        <div class="alert">We couldn't load your courts right now. Please refresh the page and try again.</div>
+    }
+    else if (courts.Count == 0)
+    {
+        <div class="empty">
+            <h2>You haven't listed a court yet</h2>
+            <p>Add your first court so players can find it on the map.</p>
+            <a class="btn btn-primary" href="owner/courts/new">List your first court</a>
+        </div>
+    }
+    else
+    {
+        <div class="grid-cards">
+            @foreach (var court in courts)
+            {
+                <div class="owned">
+                    <CourtCardView Court="court" />
+
+                    <div class="owned-actions">
+                        @if (confirmingId == court.Id)
+                        {
+                            <p class="confirm-text">Delete this court? Its photos and reviews will be removed too.</p>
+                            <div class="confirm-buttons">
+                                <button type="button" class="btn btn-danger" disabled="@(deletingId is not null)"
+                                        @onclick="() => DeleteAsync(court.Id)">
+                                    @(deletingId == court.Id ? "Deleting..." : "Yes, delete")
+                                </button>
+                                <button type="button" class="btn btn-secondary" disabled="@(deletingId is not null)"
+                                        @onclick="() => confirmingId = null">Cancel</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <a class="btn btn-secondary" href="owner/courts/@court.Id/edit">Edit</a>
+                            <button type="button" class="btn btn-ghost danger" @onclick="() => confirmingId = court.Id">Delete</button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<CourtCard> courts = new();
+    private bool loading = true;
+    private bool failed;
+    private string? error;
+    private Guid? confirmingId;
+    private Guid? deletingId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (!await Auth.RequireSignInAsync(Nav)) return;
+            courts = await OwnerApi.GetMyCourtsAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Could not load my courts");
+            failed = true;
+        }
+
+        loading = false;
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        deletingId = id;
+        error = null;
+
+        try
+        {
+            await OwnerApi.DeleteAsync(id);
+            courts.RemoveAll(c => c.Id == id);
+            confirmingId = null;
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Delete failed");
+            error = "We couldn't delete that court. Please try again.";
+        }
+
+        deletingId = null;
+    }
+}

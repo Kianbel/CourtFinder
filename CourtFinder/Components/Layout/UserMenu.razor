@@ -11,6 +11,7 @@ else if (Auth.IsSignedIn)
     <div class="user">
         <span class="avatar" aria-hidden="true">@Initial</span>
         <span class="name">@Auth.DisplayName</span>
+        <a class="btn btn-ghost" href="owner/courts">My courts</a>
         <button type="button" class="btn btn-secondary" @onclick="SignOutAsync">Sign out</button>
     </div>
 }
