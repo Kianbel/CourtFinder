@@ -193,6 +193,26 @@
 .stars { color: #f59e0b; letter-spacing: .1em; font-size: .95rem; }
 .no-reviews { padding: 1.25rem; color: var(--ink-2); text-align: center; }
 
+.review-gate {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    color: var(--ink-2);
+}
+
+.you {
+    padding: .1rem .55rem;
+    border-radius: 999px;
+    background: var(--brand-50);
+    color: var(--brand-700);
+    font-size: .75rem;
+    font-weight: 600;
+}
+
 /* ---------- Sidebar ---------- */
 .side {
     position: sticky;

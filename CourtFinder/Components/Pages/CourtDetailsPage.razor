@@ -1,6 +1,8 @@
 @page "/courts/{Id:guid}"
+@implements IDisposable
 @using System.Globalization
 @inject CourtService CourtApi
+@inject AuthService Auth
 
 <PageTitle>@(details?.Court.Name ?? "Court") | CourtFinder</PageTitle>
 
@@ -129,6 +131,22 @@
                         }
                     </div>
 
+                    @if (Auth.IsInitialized && !Auth.IsSignedIn)
+                    {
+                        <div class="card review-gate">
+                            <span>Played here? Sign in to rate this court.</span>
+                            <a class="btn btn-primary" href="@SignInHref">Sign in to review</a>
+                        </div>
+                    }
+                    else if (Auth.IsInitialized && IsOwner(c))
+                    {
+                        <div class="card review-gate">You listed this court, so you can't review it.</div>
+                    }
+                    else if (Auth.IsInitialized)
+                    {
+                        <ReviewForm CourtId="c.Id" Existing="MyReview(d)" OnChanged="OnReviewChangedAsync" />
+                    }
+
                     @if (d.Reviews.Count == 0)
                     {
                         <div class="card no-reviews">No reviews yet.</div>
@@ -143,6 +161,10 @@
                                     <div class="review-body">
                                         <div class="review-top">
                                             <strong>@r.AuthorName</strong>
+                                            @if (r.UserId == Auth.UserId)
+                                            {
+                                                <span class="you">You</span>
+                                            }
                                             <span class="muted">@r.CreatedAt.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)</span>
                                         </div>
                                         <div class="stars" aria-label="@r.Rating out of 5 stars">@Stars(r.Rating)</div>
@@ -235,6 +257,34 @@
     private List<MapPin> pins = new();
     private bool loading = true;
     private bool failed;
+
+        private string SignInHref => "login?returnUrl=" + Uri.EscapeDataString($"/courts/{Id}");
+
+    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
+
+    // Sign in / out while the page is open: swap the review area without a reload
+    private void OnAuthChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Auth.Changed -= OnAuthChanged;
+
+    private bool IsOwner(Court c) => Auth.UserId == c.OwnerId;
+
+    private ReviewView? MyReview(CourtDetails d) =>
+        Auth.UserId is { } me ? d.Reviews.FirstOrDefault(r => r.UserId == me) : null;
+
+    // Refresh the data after a review changes, without the full-page skeleton
+    private async Task OnReviewChangedAsync()
+    {
+        try
+        {
+            var fresh = await CourtApi.GetCourtDetailsAsync(Id);
+            if (fresh is not null) details = fresh;
+        }
+        catch (Exception)
+        {
+            // Keep showing what we already have
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
