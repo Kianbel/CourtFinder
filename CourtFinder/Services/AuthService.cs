@@ -1,6 +1,7 @@
 using CourtFinder.Models;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Supabase.Gotrue;
+using Microsoft.AspNetCore.Components;
 
 namespace CourtFinder.Services;
 
@@ -13,6 +14,7 @@ public class AuthService(SupabaseGate gate, ProtectedLocalStorage storage, ILogg
     private record StoredSession(string AccessToken, string RefreshToken);
 
     private bool started;
+    private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>Raised whenever the signed-in state or name changes.</summary>
     public event Action? Changed;
@@ -58,7 +60,22 @@ public class AuthService(SupabaseGate gate, ProtectedLocalStorage storage, ILogg
         }
 
         IsInitialized = true;
+        ready.TrySetResult();
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Owner pages call this first. Waits for the saved session to be restored, then returns true if signed in.
+    /// Otherwise redirects to the login page (coming back afterwards) and returns false.
+    /// </summary>
+    public async Task<bool> RequireSignInAsync(NavigationManager nav)
+    {
+        await ready.Task;
+        if (IsSignedIn) return true;
+
+        var returnUrl = "/" + nav.ToBaseRelativePath(nav.Uri);
+        nav.NavigateTo($"login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+        return false;
     }
 
     public async Task<AuthResult> SignInAsync(string email, string password)
