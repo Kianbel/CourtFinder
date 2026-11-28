@@ -100,6 +100,7 @@ public class CourtService(Supabase.Client client, SupabaseGate gate)
         var reviewViews = reviews
             .Select(r => new ReviewView(
                 r.Id,
+                r.UserId,
                 names.GetValueOrDefault(r.UserId, "Player"),
                 r.Rating,
                 r.Comment,

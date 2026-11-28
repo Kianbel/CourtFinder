@@ -2,7 +2,7 @@ namespace CourtFinder.Models;
 
 public record CourtSportInfo(Sport Sport, int CourtCount, decimal PricePerHour);
 
-public record ReviewView(Guid Id, string AuthorName, int Rating, string? Comment, DateTime CreatedAt);
+public record ReviewView(Guid Id, Guid UserId, string AuthorName, int Rating, string? Comment, DateTime CreatedAt);
 
 public record CourtDetails(
     Court Court,
