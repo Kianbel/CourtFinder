@@ -17,6 +17,7 @@ builder.Services.AddScoped(_ =>
 builder.Services.AddScoped<CourtFinder.Services.CourtService>();
 builder.Services.AddScoped<CourtFinder.Services.SupabaseGate>();
 builder.Services.AddScoped<CourtFinder.Services.AuthService>();
+builder.Services.AddScoped<CourtFinder.Services.OwnerCourtService>();
 
 var app = builder.Build();
 
