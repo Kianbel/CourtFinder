@@ -1,0 +1,168 @@
+@using System.ComponentModel.DataAnnotations
+@inject ReviewService ReviewApi
+@inject ILogger<ReviewForm> Log
+
+<div class="card review-form">
+    <h3>@(Existing is null ? "Leave a review" : "Your review")</h3>
+
+    <EditForm EditContext="editContext" OnValidSubmit="SaveAsync" class="form">
+        <DataAnnotationsValidator />
+
+        @if (error is not null)
+        {
+            <div class="alert" role="alert">@error</div>
+        }
+
+        @if (message is not null)
+        {
+            <p class="saved" role="status">@message</p>
+        }
+
+        <div>
+            <span class="label" id="rating-label">Your rating</span>
+            <div class="star-picker" role="radiogroup" aria-labelledby="rating-label">
+                @for (var i = 1; i <= 5; i++)
+                {
+                    var value = i;
+                    <button type="button" class="star @(value <= model.Rating ? "on" : "")"
+                            role="radio" aria-checked="@(value == model.Rating ? "true" : "false")"
+                            aria-label="@value out of 5 stars"
+                            @onclick="() => SetRating(value)">★</button>
+                }
+            </div>
+            <ValidationMessage For="() => model.Rating" />
+        </div>
+
+        <div>
+            <label class="label" for="review-comment">Comment (optional)</label>
+            <InputTextArea id="review-comment" class="textarea" rows="4" maxlength="@ReviewService.MaxCommentLength"
+                           placeholder="How were the courts, the lighting, the staff?" @bind-Value="model.Comment" />
+            <ValidationMessage For="() => model.Comment" />
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" disabled="@busy">
+                @(busy ? "Saving..." : Existing is null ? "Post review" : "Update review")
+            </button>
+
+            @if (Existing is not null)
+            {
+                if (confirmingDelete)
+                {
+                    <span class="muted">Delete your review?</span>
+                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DeleteAsync">Yes, delete</button>
+                    <button type="button" class="btn btn-secondary" disabled="@busy" @onclick="() => confirmingDelete = false">Cancel</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-ghost danger" @onclick="() => confirmingDelete = true">Delete</button>
+                }
+            }
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CourtId { get; set; }
+
+    /// <summary>The signed-in user's existing review of this court, if any.</summary>
+    [Parameter] public ReviewView? Existing { get; set; }
+
+    /// <summary>Raised after a review is posted, updated or deleted, so the page can reload.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly ReviewModel model = new();
+    private EditContext editContext = default!;
+    private Guid? filledFrom;
+    private bool busy;
+    private bool confirmingDelete;
+    private string? error;
+    private string? message;
+
+    protected override void OnInitialized() => editContext = new EditContext(model);
+
+    // Fill the form from the existing review, and reset it when that review goes away
+    protected override void OnParametersSet()
+    {
+        if (Existing?.Id == filledFrom) return;
+
+        filledFrom = Existing?.Id;
+        model.Rating = Existing?.Rating ?? 0;
+        model.Comment = Existing?.Comment;
+        confirmingDelete = false;
+    }
+
+    private void SetRating(int value)
+    {
+        model.Rating = value;
+        editContext.NotifyFieldChanged(editContext.Field(nameof(ReviewModel.Rating)));
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        error = null;
+        message = null;
+
+        try
+        {
+            if (Existing is null)
+                await ReviewApi.CreateAsync(CourtId, model.Rating, model.Comment);
+            else
+                await ReviewApi.UpdateAsync(Existing.Id, model.Rating, model.Comment);
+
+            message = "Review saved.";
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Saving the review failed");
+            error = FriendlyError(ex);
+        }
+
+        busy = false;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (Existing is null) return;
+
+        busy = true;
+        error = null;
+        message = null;
+
+        try
+        {
+            await ReviewApi.DeleteAsync(Existing.Id);
+            confirmingDelete = false;
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Deleting the review failed");
+            error = "We couldn't delete your review. Please try again.";
+        }
+
+        busy = false;
+    }
+
+    private static string FriendlyError(Exception ex)
+    {
+        var m = ex.Message.ToLowerInvariant();
+
+        if (m.Contains("duplicate") || m.Contains("23505") || m.Contains("unique"))
+            return "You've already reviewed this court. Reload the page to edit your review.";
+        if (m.Contains("row-level security"))
+            return "You can't review a court you listed.";
+        return "We couldn't save your review. Check your connection and try again.";
+    }
+
+    private sealed class ReviewModel
+    {
+        [Range(1, 5, ErrorMessage = "Choose a star rating.")]
+        public int Rating { get; set; }
+
+        [StringLength(ReviewService.MaxCommentLength, ErrorMessage = "Keep it under 1000 characters.")]
+        public string? Comment { get; set; }
+    }
+}
