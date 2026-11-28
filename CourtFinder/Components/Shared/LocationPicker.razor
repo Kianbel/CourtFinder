@@ -1,0 +1,99 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="picker">
+    <div class="picker-bar">
+        <button type="button" class="btn btn-secondary" @onclick="UseMyLocationAsync" disabled="@locating">
+            @(locating ? "Locating..." : "📍 Use my location")
+        </button>
+        <span class="muted hint">Click the map to drop a pin, then drag it to fine-tune.</span>
+    </div>
+
+    @if (locateError is not null)
+    {
+        <p class="validation-message">@locateError</p>
+    }
+
+    <div @ref="mapElement" class="picker-map" aria-label="Pick the court location on the map"></div>
+</div>
+
+@code {
+    [Parameter] public double? Latitude { get; set; }
+    [Parameter] public double? Longitude { get; set; }
+    [Parameter] public EventCallback<GeoPoint> OnPicked { get; set; }
+
+    private ElementReference mapElement;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<LocationPicker>? self;
+
+    // The last position JS and C# agreed on, so we don't echo changes back and forth
+    private double? sentLat, sentLng;
+    private bool locating;
+    private string? locateError;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/locationpicker.js");
+        self = DotNetObjectReference.Create(this);
+        sentLat = Latitude;
+        sentLng = Longitude;
+        await module.InvokeVoidAsync("init", mapElement, self, Latitude, Longitude);
+    }
+
+    // The latitude/longitude inputs were edited: move the pin
+    protected override async Task OnParametersSetAsync()
+    {
+        if (module is null || Latitude is null || Longitude is null) return;
+        if (Latitude == sentLat && Longitude == sentLng) return;
+        if (Math.Abs(Latitude.Value) > 90 || Math.Abs(Longitude.Value) > 180) return;
+
+        sentLat = Latitude;
+        sentLng = Longitude;
+        await module.InvokeVoidAsync("setPoint", mapElement, Latitude.Value, Longitude.Value);
+    }
+
+    [JSInvokable]
+    public async Task OnMapPicked(double lat, double lng)
+    {
+        sentLat = lat;
+        sentLng = lng;
+        await OnPicked.InvokeAsync(new GeoPoint(lat, lng));
+    }
+
+    private async Task UseMyLocationAsync()
+    {
+        if (module is null) return;
+
+        locating = true;
+        locateError = null;
+
+        var result = await module.InvokeAsync<string?>("locate", mapElement);
+
+        locating = false;
+        locateError = result switch
+        {
+            null => null,
+            "denied" => "Location access was blocked. Allow it in your browser, or click the map instead.",
+            "unsupported" => "Your browser can't share its location. Click the map instead.",
+            _ => "We couldn't get your location. Click the map instead."
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        self?.Dispose();
+        if (module is null) return;
+
+        try
+        {
+            await module.InvokeVoidAsync("destroy", mapElement);
+            await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser connection is already gone; nothing to clean up.
+        }
+    }
+}

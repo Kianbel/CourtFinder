@@ -1,0 +1,24 @@
+.picker {
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+}
+
+.picker-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+}
+
+.hint { font-size: .9rem; }
+
+.picker-map {
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
+    height: 20rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #e8eef2;
+}
