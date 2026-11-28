@@ -170,16 +170,16 @@ public class OwnerCourtService(Supabase.Client client, SupabaseGate gate, AuthSe
         await client.From<Court>()
             .Filter("id", Operator.Equals, idText)
             .Set(c => c.Name, form.Name.Trim())
-            .Set(c => c.Description, Blank(form.Description))
+            .Set(c => c.Description!, Blank(form.Description))
             .Set(c => c.Address, form.Address.Trim())
             .Set(c => c.City, form.City.Trim())
-            .Set(c => c.Province, Blank(form.Province))
+            .Set(c => c.Province!, Blank(form.Province))
             .Set(c => c.Latitude, form.Latitude!.Value)
             .Set(c => c.Longitude, form.Longitude!.Value)
             .Set(c => c.IsIndoor, form.IsIndoor)
-            .Set(c => c.Surface, Blank(form.Surface))
-            .Set(c => c.OpeningTime, ParseTime(form.OpeningTime))
-            .Set(c => c.ClosingTime, ParseTime(form.ClosingTime))
+            .Set(c => c.Surface!, Blank(form.Surface))
+            .Set(c => c.OpeningTime!, ParseTime(form.OpeningTime))
+            .Set(c => c.ClosingTime!, ParseTime(form.ClosingTime))
             .Update();
 
         // Replace the child rows

@@ -64,10 +64,10 @@
                     <div class="grid-2">
                         <div class="field">
                             <label class="label" for="setting">Setting</label>
-                            <InputSelect id="setting" class="select" @bind-Value="form.IsIndoor">
-                                <option value="@false">Outdoor</option>
-                                <option value="@true">Indoor</option>
-                            </InputSelect>
+                            <select id="setting" class="select" @onchange="OnSettingChanged">
+                                <option value="false" selected="@(!form.IsIndoor)">Outdoor</option>
+                                <option value="true" selected="@form.IsIndoor">Indoor</option>
+                            </select>
                         </div>
                         <div class="field">
                             <label class="label" for="surface">Surface</label>
@@ -144,10 +144,12 @@
                                     <label>
                                         <span class="label">Courts</span>
                                         <InputNumber class="input" min="1" max="99" @bind-Value="entry.CourtCount" />
+                                        <ValidationMessage For="() => entry.CourtCount" />
                                     </label>
                                     <label>
                                         <span class="label">Price per hour (₱)</span>
                                         <InputNumber class="input" min="0" step="any" @bind-Value="entry.Price" />
+                                        <ValidationMessage For="() => entry.Price" />
                                     </label>
                                 </div>
                             }
@@ -361,7 +363,11 @@
         form.Latitude = p.Lat;
         form.Longitude = p.Lng;
     }
-
+        private void OnSettingChanged(ChangeEventArgs e)
+    {
+        if (form is not null)
+            form.IsIndoor = e.Value?.ToString() == "true";
+    }
     private void ToggleAmenity(short id, bool on)
     {
         if (form is null) return;
@@ -539,7 +545,7 @@
         error = null;
         var fieldsOk = editContext.Validate();
         problems = ValidateExtras();
-        if (!fieldsOk) problems.Insert(0, "Some fields need your attention. They're marked in red above.");
+        if (!fieldsOk) problems.InsertRange(0, editContext.GetValidationMessages().Distinct());
         if (problems.Count > 0) return;
 
         saving = true;
