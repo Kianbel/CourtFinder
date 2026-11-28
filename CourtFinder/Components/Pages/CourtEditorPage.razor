@@ -1,0 +1,587 @@
+@page "/owner/courts/new"
+@page "/owner/courts/{Id:guid}/edit"
+@using System.Globalization
+@inject AuthService Auth
+@inject OwnerCourtService OwnerApi
+@inject CourtService CourtApi
+@inject NavigationManager Nav
+@inject ILogger<CourtEditorPage> Log
+
+<PageTitle>@(IsEdit ? "Edit court" : "List your court") | CourtFinder</PageTitle>
+
+<div class="container editor">
+    <a class="back" href="@(IsEdit ? $"courts/{Id}" : "courts")">← Cancel</a>
+
+    @if (loading)
+    {
+        <div class="skeleton sk-title" aria-busy="true"></div>
+        <div class="skeleton sk-block"></div>
+        <div class="skeleton sk-block"></div>
+    }
+    else if (loadFailed)
+    {
+        <div class="alert">We couldn't load this page right now. Please refresh and try again.</div>
+    }
+    else if (notFound)
+    {
+        <div class="empty">
+            <h2>Court not found</h2>
+            <p>It may have been removed, or it isn't one of your courts.</p>
+            <a class="btn btn-secondary" href="courts">Browse all courts</a>
+        </div>
+    }
+    else if (form is not null && editContext is not null)
+    {
+        <h1>@(IsEdit ? "Edit your court" : "List your court")</h1>
+        <p class="muted">Players will find it on the map and can book through the links you add.</p>
+
+        @if (PhotoError == "1")
+        {
+            <div class="alert top-alert" role="alert">Your court was saved, but some photos couldn't be uploaded. Add them again below.</div>
+        }
+
+        <EditForm EditContext="editContext" OnSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <div class="sections">
+
+                <section class="card block">
+                    <h2>Basics</h2>
+
+                    <div class="field">
+                        <label class="label" for="name">Court name</label>
+                        <InputText id="name" class="input" maxlength="100" @bind-Value="form.Name" />
+                        <ValidationMessage For="() => form.Name" />
+                    </div>
+
+                    <div class="field">
+                        <label class="label" for="desc">Description</label>
+                        <InputTextArea id="desc" class="textarea" rows="4" @bind-Value="form.Description"
+                                       placeholder="What makes this place good to play at?" />
+                        <ValidationMessage For="() => form.Description" />
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field">
+                            <label class="label" for="setting">Setting</label>
+                            <InputSelect id="setting" class="select" @bind-Value="form.IsIndoor">
+                                <option value="@false">Outdoor</option>
+                                <option value="@true">Indoor</option>
+                            </InputSelect>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="surface">Surface</label>
+                            <InputText id="surface" class="input" placeholder="e.g. Acrylic, wood, concrete" @bind-Value="form.Surface" />
+                            <ValidationMessage For="() => form.Surface" />
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field">
+                            <label class="label" for="opens">Opens</label>
+                            <InputText id="opens" type="time" class="input" @bind-Value="form.OpeningTime" />
+                        </div>
+                        <div class="field">
+                            <label class="label" for="closes">Closes</label>
+                            <InputText id="closes" type="time" class="input" @bind-Value="form.ClosingTime" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card block">
+                    <h2>Location</h2>
+
+                    <div class="field">
+                        <label class="label" for="address">Street address</label>
+                        <InputText id="address" class="input" autocomplete="street-address" @bind-Value="form.Address" />
+                        <ValidationMessage For="() => form.Address" />
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field">
+                            <label class="label" for="city">City</label>
+                            <InputText id="city" class="input" @bind-Value="form.City" />
+                            <ValidationMessage For="() => form.City" />
+                        </div>
+                        <div class="field">
+                            <label class="label" for="province">Province</label>
+                            <InputText id="province" class="input" @bind-Value="form.Province" />
+                        </div>
+                    </div>
+
+                    <LocationPicker Latitude="form.Latitude" Longitude="form.Longitude" OnPicked="OnLocationPicked" />
+
+                    <div class="grid-2">
+                        <div class="field">
+                            <label class="label" for="lat">Latitude</label>
+                            <InputNumber id="lat" class="input" step="any" @bind-Value="form.Latitude" />
+                            <ValidationMessage For="() => form.Latitude" />
+                        </div>
+                        <div class="field">
+                            <label class="label" for="lng">Longitude</label>
+                            <InputNumber id="lng" class="input" step="any" @bind-Value="form.Longitude" />
+                            <ValidationMessage For="() => form.Longitude" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card block">
+                    <h2>Sports and prices</h2>
+                    <p class="muted">Tick every sport you offer. Prices can differ per sport.</p>
+
+                    @foreach (var entry in form.Sports)
+                    {
+                        <div class="sport-row @(entry.Selected ? "on" : "")">
+                            <label class="check">
+                                <InputCheckbox @bind-Value="entry.Selected" />
+                                <span aria-hidden="true">@SportMeta.Emoji(entry.Slug)</span>
+                                <strong>@entry.Name</strong>
+                            </label>
+
+                            @if (entry.Selected)
+                            {
+                                <div class="sport-fields">
+                                    <label>
+                                        <span class="label">Courts</span>
+                                        <InputNumber class="input" min="1" max="99" @bind-Value="entry.CourtCount" />
+                                    </label>
+                                    <label>
+                                        <span class="label">Price per hour (₱)</span>
+                                        <InputNumber class="input" min="0" step="any" @bind-Value="entry.Price" />
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    }
+                </section>
+
+                <section class="card block">
+                    <h2>Amenities</h2>
+                    <div class="amenity-grid">
+                        @foreach (var a in amenities)
+                        {
+                            <label class="check">
+                                <input type="checkbox" checked="@form.AmenityIds.Contains(a.Id)"
+                                       @onchange="e => ToggleAmenity(a.Id, e.Value is true)" />
+                                @a.Name
+                            </label>
+                        }
+                    </div>
+                </section>
+
+                <section class="card block">
+                    <h2>How to book</h2>
+                    <p class="muted">Players are sent to these when they want to reserve. Up to @OwnerCourtService.MaxBookings options.</p>
+
+                    @foreach (var b in form.Bookings)
+                    {
+                        <div class="booking-row">
+                            <InputSelect class="select kind" @bind-Value="b.Kind" aria-label="Booking type">
+                                <option value="url">Website</option>
+                                <option value="messenger">Messenger</option>
+                                <option value="phone">Phone</option>
+                                <option value="walk_in">Walk-in note</option>
+                            </InputSelect>
+                            <InputText class="input" maxlength="300" aria-label="Booking details"
+                                       placeholder="@BookingPlaceholder(b.Kind)" @bind-Value="b.Value" />
+                            <button type="button" class="btn btn-ghost" aria-label="Remove booking option"
+                                    @onclick="() => RemoveBooking(b)">✕</button>
+                        </div>
+                    }
+
+                    <div>
+                        <button type="button" class="btn btn-secondary" @onclick="AddBooking"
+                                disabled="@(form.Bookings.Count >= OwnerCourtService.MaxBookings)">
+                            + Add booking option
+                        </button>
+                    </div>
+                </section>
+
+                <section class="card block">
+                    <h2>Photos</h2>
+                    <p class="muted">
+                        Up to @OwnerCourtService.MaxPhotos photos (JPG, PNG or WebP, 5 MB each). The first one is the cover.
+                        @(IsEdit ? "Changes to photos already uploaded happen right away; new photos upload when you save." : "Photos upload when you save.")
+                    </p>
+
+                    @if (photoNote is not null)
+                    {
+                        <div class="alert" role="alert">@photoNote</div>
+                    }
+
+                    @if (photos.Count > 0)
+                    {
+                        <ul class="photo-grid">
+                            @for (var i = 0; i < photos.Count; i++)
+                            {
+                                var photo = photos[i];
+                                var isCover = i == 0;
+                                <li class="photo">
+                                    <img src="@CourtApi.GetPhotoUrl(photo.StoragePath)" alt="Court photo @(i + 1)" loading="lazy" />
+                                    @if (isCover)
+                                    {
+                                        <span class="cover-tag">Cover</span>
+                                    }
+                                    <div class="photo-actions">
+                                        @if (!isCover)
+                                        {
+                                            <button type="button" class="btn btn-secondary btn-sm" disabled="@photoBusy"
+                                                    @onclick="() => MakeCoverAsync(photo)">Make cover</button>
+                                        }
+                                        <button type="button" class="btn btn-secondary btn-sm" disabled="@photoBusy"
+                                                @onclick="() => RemovePhotoAsync(photo)">Remove</button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    @if (pending.Count > 0)
+                    {
+                        <ul class="pending">
+                            @foreach (var item in pending)
+                            {
+                                <li>
+                                    <span>🖼 @item.Name <span class="muted">(@(Math.Max(1, item.Data.Length / 1024)) KB)</span></span>
+                                    <button type="button" class="btn btn-ghost btn-sm" @onclick="() => pending.Remove(item)">Remove</button>
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    @if (photos.Count + pending.Count < OwnerCourtService.MaxPhotos)
+                    {
+                        <InputFile OnChange="OnFilesChosen" multiple accept="image/jpeg,image/png,image/webp" />
+                    }
+                </section>
+
+                @if (problems.Count > 0)
+                {
+                    <div class="alert problems" role="alert">
+                        <strong>Please fix the following:</strong>
+                        <ul>
+                            @foreach (var p in problems)
+                            {
+                                <li>@p</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @if (error is not null)
+                {
+                    <div class="alert" role="alert">@error</div>
+                }
+
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary btn-lg" disabled="@saving">
+                        @(saving ? "Saving..." : IsEdit ? "Save changes" : "List my court")
+                    </button>
+                    <a class="btn btn-secondary btn-lg" href="@(IsEdit ? $"courts/{Id}" : "courts")">Cancel</a>
+                </div>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    [SupplyParameterFromQuery(Name = "photoError")] public string? PhotoError { get; set; }
+
+    private sealed record PendingPhoto(string Name, string ContentType, byte[] Data);
+
+    private CourtForm? form;
+    private EditContext? editContext;
+    private List<Amenity> amenities = new();
+    private List<CourtPhoto> photos = new();
+    private readonly List<PendingPhoto> pending = new();
+    private List<string> problems = new();
+
+    private bool loading = true;
+    private bool loadFailed;
+    private bool notFound;
+    private bool saving;
+    private bool photoBusy;
+    private string? error;
+    private string? photoNote;
+
+    private bool IsEdit => Id is not null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        loadFailed = false;
+        notFound = false;
+        error = null;
+        photoNote = null;
+        problems = new();
+        pending.Clear();
+
+        try
+        {
+            // Waits for the saved session; sends the user to sign in when needed
+            if (!await Auth.RequireSignInAsync(Nav)) return;
+
+            amenities = await CourtApi.GetAmenitiesAsync();
+
+            if (Id is null)
+            {
+                form = await OwnerApi.NewFormAsync();
+                photos = new();
+            }
+            else
+            {
+                var editable = await OwnerApi.GetForEditAsync(Id.Value);
+                if (editable is null)
+                {
+                    notFound = true;
+                    form = null;
+                }
+                else
+                {
+                    form = editable.Form;
+                    photos = editable.Photos;
+                }
+            }
+
+            editContext = form is null ? null : new EditContext(form);
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Could not load the court editor");
+            loadFailed = true;
+        }
+
+        loading = false;
+    }
+
+    private void OnLocationPicked(GeoPoint p)
+    {
+        if (form is null) return;
+        form.Latitude = p.Lat;
+        form.Longitude = p.Lng;
+    }
+
+    private void ToggleAmenity(short id, bool on)
+    {
+        if (form is null) return;
+        if (on) form.AmenityIds.Add(id);
+        else form.AmenityIds.Remove(id);
+    }
+
+    private void AddBooking()
+    {
+        if (form is not null && form.Bookings.Count < OwnerCourtService.MaxBookings)
+            form.Bookings.Add(new BookingEntry());
+    }
+
+    private void RemoveBooking(BookingEntry b) => form?.Bookings.Remove(b);
+
+    private static string BookingPlaceholder(string kind) => kind switch
+    {
+        "url" => "https://yourcourt.com/book",
+        "messenger" => "https://m.me/yourpage or just your page name",
+        "phone" => "+63 900 000 0000",
+        "walk_in" => "e.g. First come, first served",
+        _ => ""
+    };
+
+    // ---------- Photos ----------
+
+    private async Task OnFilesChosen(InputFileChangeEventArgs e)
+    {
+        photoNote = null;
+        var room = OwnerCourtService.MaxPhotos - photos.Count - pending.Count;
+        var skipped = new List<string>();
+
+        IReadOnlyList<IBrowserFile> files;
+        try
+        {
+            files = e.GetMultipleFiles(OwnerCourtService.MaxPhotos);
+        }
+        catch (InvalidOperationException)
+        {
+            photoNote = $"Choose up to {OwnerCourtService.MaxPhotos} photos at a time.";
+            return;
+        }
+
+        foreach (var file in files)
+        {
+            if (room <= 0) { skipped.Add($"{file.Name} (limit of {OwnerCourtService.MaxPhotos} photos)"); continue; }
+            if (!OwnerCourtService.PhotoTypes.ContainsKey(file.ContentType)) { skipped.Add($"{file.Name} (not a JPG, PNG or WebP)"); continue; }
+            if (file.Size > OwnerCourtService.MaxPhotoBytes) { skipped.Add($"{file.Name} (over 5 MB)"); continue; }
+
+            try
+            {
+                // Read now, upload on save
+                await using var stream = file.OpenReadStream(OwnerCourtService.MaxPhotoBytes);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                pending.Add(new PendingPhoto(file.Name, file.ContentType, ms.ToArray()));
+                room--;
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning(ex, "Could not read {File}", file.Name);
+                skipped.Add($"{file.Name} (couldn't be read)");
+            }
+        }
+
+        if (skipped.Count > 0)
+            photoNote = "Skipped: " + string.Join("; ", skipped) + ".";
+    }
+
+    private async Task MakeCoverAsync(CourtPhoto photo)
+    {
+        if (Id is null) return;
+        photoBusy = true;
+        photoNote = null;
+
+        try
+        {
+            await OwnerApi.MakeCoverAsync(photo);
+            photos = await OwnerApi.GetPhotosAsync(Id.Value);
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Make cover failed");
+            photoNote = "We couldn't change the cover photo. Please try again.";
+        }
+
+        photoBusy = false;
+    }
+
+    private async Task RemovePhotoAsync(CourtPhoto photo)
+    {
+        if (Id is null) return;
+        photoBusy = true;
+        photoNote = null;
+
+        try
+        {
+            await OwnerApi.RemovePhotoAsync(photo);
+            photos = await OwnerApi.GetPhotosAsync(Id.Value);
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Remove photo failed");
+            photoNote = "We couldn't remove that photo. Please try again.";
+        }
+
+        photoBusy = false;
+    }
+
+    // Uploads queued photos; returns how many failed (successful ones leave the queue)
+    private async Task<int> UploadPendingAsync(Guid courtId)
+    {
+        var failed = 0;
+        foreach (var item in pending.ToList())
+        {
+            try
+            {
+                await OwnerApi.AddPhotoAsync(courtId, item.Data, item.ContentType);
+                pending.Remove(item);
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning(ex, "Photo upload failed for {File}", item.Name);
+                failed++;
+            }
+        }
+        return failed;
+    }
+
+    // ---------- Saving ----------
+
+    private List<string> ValidateExtras()
+    {
+        var list = new List<string>();
+        if (form is null) return list;
+
+        var selected = form.Sports.Where(s => s.Selected).ToList();
+        if (selected.Count == 0) list.Add("Choose at least one sport.");
+
+        foreach (var s in selected)
+        {
+            if (s.CourtCount is < 1 or > 99) list.Add($"{s.Name}: the number of courts must be between 1 and 99.");
+            if (s.Price is null or < 0) list.Add($"{s.Name}: enter a price per hour (use 0 if it's free).");
+        }
+
+        var hasOpen = !string.IsNullOrWhiteSpace(form.OpeningTime);
+        var hasClose = !string.IsNullOrWhiteSpace(form.ClosingTime);
+        if (hasOpen != hasClose)
+            list.Add("Enter both opening and closing time, or leave both empty.");
+        else if (hasOpen && (!TimeSpan.TryParse(form.OpeningTime, CultureInfo.InvariantCulture, out _)
+                          || !TimeSpan.TryParse(form.ClosingTime, CultureInfo.InvariantCulture, out _)))
+            list.Add("Opening and closing time must be valid times.");
+
+        for (var i = 0; i < form.Bookings.Count; i++)
+        {
+            var b = form.Bookings[i];
+            if (string.IsNullOrWhiteSpace(b.Value)) continue; // blank rows are ignored
+
+            if (b.Kind != "walk_in" && BookingUi.Href(new BookingLink { Kind = b.Kind, Value = b.Value }) is null)
+                list.Add($"Booking option {i + 1}: " + (b.Kind == "phone"
+                    ? "enter a valid phone number."
+                    : "enter a valid web link (http or https)."));
+        }
+
+        if (photos.Count + pending.Count > OwnerCourtService.MaxPhotos)
+            list.Add($"You can have at most {OwnerCourtService.MaxPhotos} photos.");
+
+        return list;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (form is null || editContext is null || saving) return;
+
+        error = null;
+        var fieldsOk = editContext.Validate();
+        problems = ValidateExtras();
+        if (!fieldsOk) problems.Insert(0, "Some fields need your attention. They're marked in red above.");
+        if (problems.Count > 0) return;
+
+        saving = true;
+        try
+        {
+            Guid courtId;
+            if (Id is null)
+            {
+                courtId = await OwnerApi.CreateAsync(form);
+            }
+            else
+            {
+                courtId = Id.Value;
+                await OwnerApi.UpdateAsync(courtId, form);
+            }
+
+            var failed = await UploadPendingAsync(courtId);
+
+            if (failed == 0)
+            {
+                Nav.NavigateTo($"courts/{courtId}");
+                return;
+            }
+
+            if (Id is null)
+            {
+                // The court exists now; finish the photos from the edit page
+                Nav.NavigateTo($"owner/courts/{courtId}/edit?photoError=1");
+                return;
+            }
+
+            photos = await OwnerApi.GetPhotosAsync(courtId);
+            photoNote = $"Your changes were saved, but {failed} photo(s) couldn't be uploaded. Try adding them again.";
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning(ex, "Saving the court failed");
+            error = "We couldn't save your court. Check your connection and try again.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}
